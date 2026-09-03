@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 32'%3E%3Crect x='5' y='6' width='3.4' height='20' fill='%23111'/%3E%3Cpath d='M8.4 26 L21 6 H24.4 L11.8 26 Z' fill='%23111'/%3E%3Crect x='21' y='6' width='3.4' height='20' fill='%23111'/%3E%3Cpath d='M24.4 6 H26.5 A6 6 0 0 1 26.5 18 H24.4' fill='none' stroke='%23111' stroke-width='3.4'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -23,6 +24,11 @@ h1.serif,h2.serif{letter-spacing:-0.015em}
 </style>
 </head>
 <body class="antialiased">
+<div class="grid grid-cols-3 gap-1 px-1 pt-1" aria-label="In this report">
+<a href="#film" class="block overflow-hidden" style="border-radius:4px"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/The_field_at_Azteca_Stadium_in_Mexico_City_during_the_opening_ceremony_of_the_2026_World_Cup.jpg?width=600" alt="World Cup opening ceremony" loading="lazy" referrerpolicy="no-referrer" class="w-full h-24 sm:h-32 object-cover"></a>
+<a href="#film" class="block overflow-hidden" style="border-radius:4px"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Falcon_9_Starlink_6-39_Launch_(8255768).jpg?width=600" alt="Rocket launch" loading="lazy" referrerpolicy="no-referrer" class="w-full h-24 sm:h-32 object-cover"></a>
+<a href="#film" class="block overflow-hidden" style="border-radius:4px"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Mountain_Pass_Rare_Earth_Mine_&_Processing_Facility.jpg?width=600" alt="Rare earth mine from above" loading="lazy" referrerpolicy="no-referrer" class="w-full h-24 sm:h-32 object-cover"></a>
+</div>
 
 <main class="max-w-3xl mx-auto px-6 py-12 space-y-12">
 
@@ -97,6 +103,86 @@ h1.serif,h2.serif{letter-spacing:-0.015em}
 <div class="card p-6 sm:p-8 space-y-5">
 <div class="flex items-center gap-2">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#E4572E" stroke-width="1.5" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/><path d="M8 2v3M12 2v3M8 15v3M12 15v3M2 8h3M2 12h3M15 8h3M15 12h3"/></svg>
+<div class="card p-6 sm:p-8 space-y-5" id="film">
+<h2 class="serif text-2xl text-[#111111]">Watch the quarter in ninety seconds</h2>
+<p class="prose-p">Press play. The camera flies over the quarter's landscape while a narrator reads the story aloud, with photos appearing as each part begins.</p>
+<div class="overflow-hidden" style="border-radius:6px;border:1px solid #E9E9E7">
+<div id="sceneWrap" class="relative w-full" style="height:300px;background:#DDEBE6">
+<canvas id="scene" class="w-full h-full block"></canvas>
+<img id="still" alt="" class="absolute inset-0 w-full h-full object-cover" style="opacity:0;transition:opacity .8s" referrerpolicy="no-referrer">
+<p id="stillCap" class="absolute left-3 bottom-3 right-3 text-xs text-white leading-relaxed px-3 py-2" style="background:rgba(17,17,17,.65);border-radius:6px;opacity:0;transition:opacity .8s"></p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button id="playBtn" class="inline-flex items-center gap-2 bg-[#111111] text-white text-sm font-semibold px-5 py-2.5 rounded-full"><span id="playIcon" aria-hidden="true">▶</span><span id="playLabel">Play the narration</span></button>
+<span id="filmStatus" class="text-xs text-[#737373]">Three parts, about 90 seconds.</span>
+</div>
+<p class="text-xs text-[#A3A3A3] leading-relaxed">The voice is generated in your browser, so it works with no account and no fees. If you later want a studio voice, connect an ElevenLabs or OpenAI key and the same script will play through it.</p>
+<script>
+(function(){
+var canvas=document.getElementById('scene'),wrap=document.getElementById('sceneWrap');
+var renderer,scene,camera,angle=0,auto=true,running=true,lastTouch=0;
+function noise(x,z){return Math.sin(x*0.35)*Math.cos(z*0.3)*1.6+Math.sin(x*0.12+z*0.21)*2.2+Math.cos(z*0.5+x*0.08)*0.7;}
+function build(){
+renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+scene=new THREE.Scene();
+scene.background=new THREE.Color(0xDDEBE6);
+scene.fog=new THREE.Fog(0xDDEBE6,30,70);
+camera=new THREE.PerspectiveCamera(55,1,false);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8AA39B,0.9));
+var sun=new THREE.DirectionalLight(0xfff6e8,0.9);sun.position.set(18,26,10);scene.add(sun);
+var g=new THREE.PlaneGeometry(64,64,80,80);g.rotateX(-Math.PI/2);
+var pos=g.attributes.position,colors=[];
+var cSand=new THREE.Color(0xE4D6B8),cGrass=new THREE.Color(0x7FA67A),cRock=new THREE.Color(0x9A958C),tmp=new THREE.Color();
+for(var i=0;i<pos.count;i++){var x=pos.getX(i),z=pos.getZ(i);var d=Math.sqrt(x*x+z*z);var h=noise(x,z)-Math.max(0,(d-14))*0.35;pos.setY(i,h);
+var t=Math.min(1,Math.max(0,(h+1.5)/5));if(h<0.4){tmp.copy(cSand);}else if(h<3){tmp.copy(cGrass).lerp(cSand,Math.max(0,1-(h-0.4)/1.6));}else{tmp.copy(cRock).lerp(cGrass,Math.max(0,1-(h-3)/2.5));}
+colors.push(tmp.r,tmp.g,tmp.b);}
+g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+scene.add(new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true})));
+var water=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshLambertMaterial({color:0x9CC8BF,transparent:true,opacity:0.9}));
+water.rotation.x=-Math.PI/2;water.position.y=-0.5;scene.add(water);
+var trunkG=new THREE.CylinderGeometry(0.12,0.16,0.8,5),topG=new THREE.ConeGeometry(0.9,2.2,6);
+var trunkM=new THREE.MeshLambertMaterial({color:0x6B4A35}),topM=new THREE.MeshLambertMaterial({color:0x4E7A52});
+var trunks=new THREE.InstancedMesh(trunkG,trunkM,140),tops=new THREE.InstancedMesh(topG,topM,140);
+var m=new THREE.Matrix4(),n=0,guard=0;
+while(n<140&&guard++<3000){var px=(Math.random()-0.5)*44,pz=(Math.random()-0.5)*44;var dd=Math.sqrt(px*px+pz*pz);if(dd>10){var hh=noise(px,pz)-Math.max(0,(dd-14))*0.35;if(hh>0.5&&hh<3.4){var s=0.7+Math.random()*0.7;m.makeScale(s,s,s);m.setPosition(px,hh+0.4*s,pz);trunks.setMatrixAt(n,m);m.setPosition(px,hh+(0.8+1.1)*s,pz);tops.setMatrixAt(n,m);n++;}}}
+scene.add(trunks);scene.add(tops);
+for(var r=0;r<10;r++){var rock=new THREE.Mesh(new THREE.DodecahedronGeometry(0.5+Math.random()*0.9),new THREE.MeshLambertMaterial({color:0x8B867D}));var rx=(Math.random()-0.5)*40,rz=(Math.random()-0.5)*40;rock.position.set(rx,noise(rx,rz)+0.3,rz);scene.add(rock);}
+resize();
+}
+function resize(){var w=wrap.clientWidth,h=wrap.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);
+canvas.addEventListener('pointerdown',function(){auto=false;lastTouch=Date.now();});
+window.addEventListener('pointerup',function(){setTimeout(function(){auto=true;},3000);});
+var seen=true;
+if('IntersectionObserver' in window){new IntersectionObserver(function(e){seen=e[0].isIntersecting;},{threshold:0.05}).observe(wrap);}
+var t0=Date.now();
+(function loop(){requestAnimationFrame(loop);if(!running||!seen)return;var t=(Date.now()-t0)/1000;if(auto)angle+=0.0016;var r=27;camera.position.set(Math.cos(angle)*r,11+Math.sin(t*0.18)*2.5,Math.sin(angle)*r);camera.lookAt(0,2.2,0);renderer.render(scene,camera);})();
+try{build();}catch(e){wrap.innerHTML='<p class="text-sm p-6" style="color:#737373">3D could not start in this browser. The story below reads the same.</p>';}
+var parts=[
+{text:"This spring, sixteen hundred American startups raised twenty-seven billion dollars. Two giant AI companies took nearly half of all startup money on Earth. Everything that follows is about everyone else.",img:"https://commons.wikimedia.org/wiki/Special:FilePath/The_field_at_Azteca_Stadium_in_Mexico_City_during_the_opening_ceremony_of_the_2026_World_Cup.jpg?width=1200",cap:"Mexico City, June 11. The World Cup opened in the middle of the quarter."},
+{text:"The money went to robot ships in Texas, reusable rockets in Washington, and magnet factories in North Carolina. It went to databases for app builders, banks for startups, and digital dollars with a new federal license.",img:"https://commons.wikimedia.org/wiki/Special:FilePath/Falcon_9_Starlink_6-39_Launch_(8255768).jpg?width=1200",cap:"Cape Canaveral. Rockets carried data centers as well as satellites this year."},
+{text:"And every raise on this page points to a customer. Ships serve the Navy. Software serves hospitals and schools. The full list of sixteen hundred companies is at the end of this page, for two hundred and forty-nine dollars.",img:"https://commons.wikimedia.org/wiki/Special:FilePath/Mountain_Pass_Rare_Earth_Mine_&_Processing_Facility.jpg?width=1200",cap:"Mountain Pass, California. Every motor in the story starts in a mine like this."}
+];
+var btn=document.getElementById('playBtn'),label=document.getElementById('playLabel'),icon=document.getElementById('playIcon'),status=document.getElementById('filmStatus'),still=document.getElementById('still'),cap=document.getElementById('stillCap');
+var synth=window.speechSynthesis,idx=0,playing=false;
+function show(i){still.src=parts[i].img;still.alt=parts[i].cap;cap.textContent=parts[i].cap;still.style.opacity=1;cap.style.opacity=1;}
+function hide(){still.style.opacity=0;cap.style.opacity=0;}
+function speak(i){
+if(i>=parts.length){playing=false;icon.textContent='▶';label.textContent='Replay the narration';status.textContent='Finished. Replay anytime.';setTimeout(hide,2500);return;}
+idx=i;show(i);status.textContent='Part '+(i+1)+' of 3.';
+var u=new SpeechSynthesisUtterance(parts[i].text);u.rate=0.98;u.onend=function(){speak(i+1);};u.onerror=function(){playing=false;icon.textContent='▶';label.textContent='Play the narration';};
+synth.speak(u);
+}
+btn.addEventListener('click',function(){
+if(!synth){status.textContent='Voice is not supported in this browser. The written story covers the same ground.';return;}
+if(playing){synth.cancel();playing=false;icon.textContent='▶';label.textContent='Play the narration';status.textContent='Paused.';return;}
+synth.cancel();playing=true;icon.textContent='⏸';label.textContent='Pause';speak(0);
+});
+})();
+</script>
+</div>
+
 <h3 class="serif text-xl text-[#111111]">Six companies are selling tools to the AI builders</h3>
 </div>
 <p class="prose-p">When computing demand outruns supply, the toolmakers raise money first. These six did.</p>
