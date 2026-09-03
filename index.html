@@ -8,6 +8,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -113,10 +114,12 @@ h1.serif,h2.serif{letter-spacing:-0.015em}
 <p id="stillCap" class="absolute left-3 bottom-3 right-3 text-xs text-white leading-relaxed px-3 py-2" style="background:rgba(17,17,17,.65);border-radius:6px;opacity:0;transition:opacity .8s"></p>
 </div>
 </div>
-<div class="flex items-center gap-3">
+<div class="flex items-center gap-3 flex-wrap">
 <button id="playBtn" class="inline-flex items-center gap-2 bg-[#111111] text-white text-sm font-semibold px-5 py-2.5 rounded-full"><span id="playIcon" aria-hidden="true">▶</span><span id="playLabel">Play the narration</span></button>
+<button id="musicBtn" class="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-full bg-white" style="border:1px solid #E9E9E7;color:#111111"><span aria-hidden="true">♪</span><span id="musicLabel">Music: on</span></button>
 <span id="filmStatus" class="text-xs text-[#737373]">Three parts, about 90 seconds.</span>
 </div>
+<div id="ytplayer" style="position:absolute;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none" aria-hidden="true"></div>
 <p class="text-xs text-[#A3A3A3] leading-relaxed">The voice is generated in your browser, so it works with no account and no fees. If you later want a studio voice, connect an ElevenLabs or OpenAI key and the same script will play through it.</p>
 <script>
 (function(){
@@ -166,18 +169,27 @@ var parts=[
 ];
 var btn=document.getElementById('playBtn'),label=document.getElementById('playLabel'),icon=document.getElementById('playIcon'),status=document.getElementById('filmStatus'),still=document.getElementById('still'),cap=document.getElementById('stillCap');
 var synth=window.speechSynthesis,idx=0,playing=false;
+var YTplayer=null,YTready=false,musicOn=true,fadeTimer=null,segIdx=0;
+var SEGS=[[404,750],[930,1290]];
+window.__filmPlaying=false;
+function onYouTubeIframeAPIReady(){try{YTplayer=new YT.Player('ytplayer',{videoId:'cTTO3dg3b7s',playerVars:{controls:0,disablekb:1,rel:0},events:{onReady:function(e){YTready=true;try{e.target.setVolume(0);}catch(x){}},onStateChange:function(e){if(e.data===YT.PlayerState.ENDED){if(window.__filmPlaying&&musicOn){segIdx=(segIdx+1)%SEGS.length;cueSeg();}else{fadeTo(0,3000);}}},onError:function(){status.textContent='Music track unavailable. Narration still plays.';}}});}catch(e){}}
+function fadeTo(target,ms){if(!YTready||!YTplayer)return;try{clearInterval(fadeTimer);var v=YTplayer.getVolume();var steps=Math.max(1,Math.round(ms/250));var dv=(target-v)/steps;if(dv===0)return;fadeTimer=setInterval(function(){v+=dv;if((dv>0&&v>=target)||(dv<0&&v<=target)){v=target;clearInterval(fadeTimer);}try{YTplayer.setVolume(Math.round(v));}catch(e){clearInterval(fadeTimer);}},250);}catch(e){}}
+function cueSeg(){if(!YTready||!YTplayer)return;var s=SEGS[segIdx%SEGS.length];try{YTplayer.setVolume(0);YTplayer.loadVideoById({videoId:'cTTO3dg3b7s',startSeconds:s[0],endSeconds:s[1]});}catch(e){}fadeTo(musicOn?22:0,5000);}
+function MusicStart(){if(!musicOn)return;if(!YTready){setTimeout(MusicStart,900);return;}segIdx=0;cueSeg();}
+function MusicStop(){fadeTo(0,2500);}
+document.getElementById('musicBtn').addEventListener('click',function(){musicOn=!musicOn;document.getElementById('musicLabel').textContent=musicOn?'Music: on':'Music: off';if(!musicOn){MusicStop();}else if(window.__filmPlaying){MusicStart();}});
 function show(i){still.src=parts[i].img;still.alt=parts[i].cap;cap.textContent=parts[i].cap;still.style.opacity=1;cap.style.opacity=1;}
 function hide(){still.style.opacity=0;cap.style.opacity=0;}
 function speak(i){
-if(i>=parts.length){playing=false;icon.textContent='▶';label.textContent='Replay the narration';status.textContent='Finished. Replay anytime.';setTimeout(hide,2500);return;}
+if(i>=parts.length){playing=false;window.__filmPlaying=false;MusicStop();icon.textContent='▶';label.textContent='Replay the narration';status.textContent='Finished. Replay anytime.';setTimeout(hide,2500);return;}
 idx=i;show(i);status.textContent='Part '+(i+1)+' of 3.';
 var u=new SpeechSynthesisUtterance(parts[i].text);u.rate=0.98;u.onend=function(){speak(i+1);};u.onerror=function(){playing=false;icon.textContent='▶';label.textContent='Play the narration';};
 synth.speak(u);
 }
 btn.addEventListener('click',function(){
 if(!synth){status.textContent='Voice is not supported in this browser. The written story covers the same ground.';return;}
-if(playing){synth.cancel();playing=false;icon.textContent='▶';label.textContent='Play the narration';status.textContent='Paused.';return;}
-synth.cancel();playing=true;icon.textContent='⏸';label.textContent='Pause';speak(0);
+if(playing){synth.cancel();playing=false;window.__filmPlaying=false;MusicStop();icon.textContent='▶';label.textContent='Play the narration';status.textContent='Paused.';return;}
+synth.cancel();playing=true;window.__filmPlaying=true;icon.textContent='⏸';label.textContent='Pause';MusicStart();speak(0);
 });
 })();
 </script>
